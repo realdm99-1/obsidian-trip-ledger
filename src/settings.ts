@@ -1,9 +1,11 @@
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
+import type { SettingDefinitionItem } from 'obsidian';
 import type TripLedgerPlugin from './main';
 import { t, type Language } from './i18n';
-import { AddCategoryModal } from './ui/category-controls';
-import { renderTripSettings } from './ui/trip-settings';
-import { renderExistingLedgerSettings } from './ui/existing-ledger-settings';
+import type { CustomCategory } from './model/types';
+import { configureAddCategorySetting, configureCategorySetting } from './ui/category-settings';
+import { configureNewTripSetting, configureTripFolderSetting, renderTripSettings } from './ui/trip-settings';
+import { configureExistingLedgerSetting, renderExistingLedgerSettings } from './ui/existing-ledger-settings';
 
 export interface TripLedgerSettings {
 	language: Language;
@@ -19,16 +21,122 @@ export const DEFAULT_SETTINGS: TripLedgerSettings = {
 };
 
 export class TripLedgerSettingTab extends PluginSettingTab {
+	private cachedCategories: CustomCategory[] = [];
+	private cachedCategoryRoot: string | null = null;
+	private loadingCategoryRoot: string | null = null;
+	private categoryLoadError: string | null = null;
+	private categoryLoadGeneration = 0;
+
 	constructor(app: App, private plugin: TripLedgerPlugin) {
 		super(app, plugin);
 	}
 
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		const language = this.plugin.settings.language;
+		const root = this.plugin.files.root;
+		const categories = this.cachedCategoryRoot === root ? this.cachedCategories : [];
+		const definitions: SettingDefinitionItem[] = [
+			{
+				name: t('language', language),
+				desc: t('languageDesc', language),
+				render: (setting) => this.configureLanguageSetting(setting, language),
+			},
+			{
+				name: t('ledgerFolder', language),
+				desc: t('ledgerFolderDesc', language),
+				render: (setting) => this.configureLedgerFolderSetting(setting, language),
+			},
+			{
+				type: 'group',
+				heading: t('existingLedger', language),
+				items: [{
+					name: t('selectLedger', language),
+					aliases: [t('existingLedger', language)],
+					render: (setting) => {
+						void configureExistingLedgerSetting(setting, this.plugin, language, () => this.refreshCategorySettings());
+					},
+				}],
+			},
+			{
+				type: 'group',
+				heading: t('currentTrip', language),
+				items: [
+					{
+						name: t('newTrip', language),
+						render: (setting) => {
+							setting.setName(t('newTrip', language));
+							configureNewTripSetting(setting, this.plugin, language, () => this.redisplay());
+						},
+					},
+					{
+						name: t('selectTripFolder', language),
+						render: (setting) => {
+							void configureTripFolderSetting(setting, this.plugin, language, () => this.redisplay());
+						},
+					},
+				],
+			},
+			{
+				type: 'group',
+				heading: t('categorySettings', language),
+				items: [
+					{
+						name: t('addCategory', language),
+						desc: this.categoryLoadError
+							? `${t('fileError', language)} ${this.categoryLoadError}`
+							: t('categorySettingsDesc', language),
+						render: (setting) => {
+							setting.setName(t('addCategory', language));
+							setting.setDesc(this.categoryLoadError
+								? `${t('fileError', language)} ${this.categoryLoadError}`
+								: t('categorySettingsDesc', language));
+							configureAddCategorySetting(setting, this.plugin, language, () => this.refreshCategorySettings());
+						void this.ensureCategoryCacheLoaded();
+						},
+					},
+					...categories.map((category) => ({
+						name: category.name,
+						render: (setting: Setting) => configureCategorySetting(
+							setting, category, this.plugin, language, () => this.refreshCategorySettings(),
+						),
+					})),
+				],
+			},
+		];
+		if (this.plugin.rootRecoveryWarning) definitions.splice(1, 0, {
+			name: t('folderRecoveryWarning', language),
+			desc: this.plugin.rootRecoveryWarning,
+			render: (setting) => {
+				setting.setName(t('folderRecoveryWarning', language))
+					.setDesc(this.plugin.rootRecoveryWarning ?? '');
+			},
+		});
+		return definitions;
+	}
+
 	display(): void {
+		this.renderLegacy();
+	}
+
+	private renderLegacy(): void {
 		const { containerEl } = this;
 		const language = this.plugin.settings.language;
 		containerEl.empty();
-		new Setting(containerEl)
-			.setName(t('language', language))
+		this.configureLanguageSetting(new Setting(containerEl), language);
+		if (this.plugin.rootRecoveryWarning) {
+			containerEl.createEl('p', {
+				cls: 'trip-ledger-error',
+				text: `${t('folderRecoveryWarning', language)} ${this.plugin.rootRecoveryWarning}`,
+			});
+		}
+		this.configureLedgerFolderSetting(new Setting(containerEl), language);
+		void renderExistingLedgerSettings(containerEl, this.plugin, language, () => this.refreshCategorySettings());
+		void renderTripSettings(containerEl, this.plugin, language, () => this.redisplay());
+		void this.renderCategories(containerEl, language);
+	}
+
+	private configureLanguageSetting(setting: Setting, language: Language): void {
+		setting.setName(t('language', language))
 			.setDesc(t('languageDesc', language))
 			.addDropdown((dropdown) => dropdown
 				.addOption('ko', '한국어')
@@ -37,23 +145,19 @@ export class TripLedgerSettingTab extends PluginSettingTab {
 				.onChange(async (value) => {
 					try {
 						await this.plugin.updateSettings({ language: value === 'en' ? 'en' : 'ko' });
-						this.display();
+						this.redisplay();
 						this.plugin.refreshViews();
 					} catch (error) {
-						this.display();
+						this.redisplay();
 						new Notice(`${t('failed', language)} ${error instanceof Error ? error.message : String(error)}`);
 					}
 				}));
-		if (this.plugin.rootRecoveryWarning) {
-			containerEl.createEl('p', {
-				cls: 'trip-ledger-error',
-				text: `${t('folderRecoveryWarning', language)} ${this.plugin.rootRecoveryWarning}`,
-			});
-		}
+	}
+
+	private configureLedgerFolderSetting(setting: Setting, language: Language): void {
 		let requestedName = this.plugin.files.root;
 		let inProgress = false;
-		new Setting(containerEl)
-			.setName(t('ledgerFolder', language))
+		setting.setName(t('ledgerFolder', language))
 			.setDesc(t('ledgerFolderDesc', language))
 			.addText((text) => text
 				.setValue(requestedName)
@@ -67,18 +171,54 @@ export class TripLedgerSettingTab extends PluginSettingTab {
 					try {
 						await this.plugin.renameLedgerRoot(requestedName);
 						new Notice(t('folderRenamed', language));
-						this.display();
+						this.refreshCategorySettings();
 					} catch (error) {
-						this.display();
+						this.redisplay();
 						new Notice(`${t('folderRenameFailed', language)} ${error instanceof Error ? error.message : String(error)}`);
 					} finally {
 						inProgress = false;
 						button.setDisabled(false);
 					}
 				}));
-		void renderExistingLedgerSettings(containerEl, this.plugin, language, () => this.display());
-		void renderTripSettings(containerEl, this.plugin, language, () => this.display());
-		void this.renderCategories(containerEl, language);
+	}
+
+	private redisplay(): void {
+		const modernTab = this as { update?: () => void };
+		if (typeof modernTab.update === 'function') modernTab.update();
+		else this.renderLegacy();
+	}
+
+	private refreshCategorySettings(): void {
+		this.categoryLoadGeneration++;
+		this.cachedCategories = [];
+		this.cachedCategoryRoot = null;
+		this.loadingCategoryRoot = null;
+		this.categoryLoadError = null;
+		this.redisplay();
+	}
+
+	private async ensureCategoryCacheLoaded(): Promise<void> {
+		const root = this.plugin.files.root;
+		if (this.cachedCategoryRoot === root || this.loadingCategoryRoot === root) return;
+		const generation = ++this.categoryLoadGeneration;
+		this.loadingCategoryRoot = root;
+		try {
+			const categories = await this.plugin.categoryStore.list();
+			if (this.plugin.files.root !== root || this.categoryLoadGeneration !== generation) return;
+			this.cachedCategories = categories;
+			this.cachedCategoryRoot = root;
+			this.categoryLoadError = null;
+		} catch (error) {
+			if (this.plugin.files.root !== root || this.categoryLoadGeneration !== generation) return;
+			this.cachedCategories = [];
+			this.cachedCategoryRoot = root;
+			this.categoryLoadError = error instanceof Error ? error.message : String(error);
+		} finally {
+			if (this.categoryLoadGeneration === generation) {
+				this.loadingCategoryRoot = null;
+				this.redisplay();
+			}
+		}
 	}
 
 	private async renderCategories(containerEl: HTMLElement, language: Language): Promise<void> {
@@ -89,33 +229,9 @@ export class TripLedgerSettingTab extends PluginSettingTab {
 			const categories = await this.plugin.categoryStore.list();
 			if (categories.length === 0) section.createEl('p', { text: t('noCustomCategories', language) });
 			for (const category of categories) {
-				new Setting(section)
-					.setName(category.name)
-					.setDesc(category.archived ? t('hidden', language) : '')
-					.addButton((button) => button.setButtonText(t('rename', language)).onClick(() => {
-						new AddCategoryModal(this.app, language, async (name) => {
-							await this.plugin.categoryStore.rename(category.id, name);
-							this.display();
-							this.plugin.refreshViews();
-						}, category.name, 'rename').open();
-					}))
-					.addButton((button) => button.setButtonText(t(category.archived ? 'restore' : 'hide', language)).onClick(async () => {
-						try {
-							await this.plugin.categoryStore.setArchived(category.id, !category.archived);
-							this.display();
-							this.plugin.refreshViews();
-						} catch (error) {
-							new Notice(`${t('failed', language)} ${error instanceof Error ? error.message : String(error)}`);
-						}
-					}));
+				configureCategorySetting(new Setting(section), category, this.plugin, language, () => this.refreshCategorySettings());
 			}
-			new Setting(section).addButton((button) => button.setCta().setButtonText(t('addCategory', language)).onClick(() => {
-				new AddCategoryModal(this.app, language, async (name) => {
-					await this.plugin.categoryStore.add(name);
-					this.display();
-					this.plugin.refreshViews();
-				}).open();
-			}));
+			configureAddCategorySetting(new Setting(section), this.plugin, language, () => this.refreshCategorySettings());
 		} catch (error) {
 			section.createEl('p', { cls: 'trip-ledger-error', text: `${t('fileError', language)} ${error instanceof Error ? error.message : String(error)}` });
 		}

@@ -30,11 +30,6 @@ export default defineConfig(
 	},
 	...obsidianmd.configs.recommended,
 	{
-		files: ['src/settings.ts'],
-		// The declarative settings search API requires Obsidian 1.13.0; this plugin supports 1.7.2.
-		rules: { 'obsidianmd/settings-tab/prefer-setting-definitions': 'off' },
-	},
-	{
 		files: ['tests/**/*.ts'],
 		languageOptions: { globals: globals.node },
 		rules: {

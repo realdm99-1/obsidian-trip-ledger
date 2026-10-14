@@ -1,6 +1,6 @@
 {
 	"name": "trip-ledger",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Record trip expenses by date in Obsidian",
 	"main": "main.js",
 	"type": "module",
@@ -21,7 +21,7 @@
 		"eslint-plugin-obsidianmd": "^0.4.0",
 		"globals": "^17.6.0",
 		"jiti": "^2.6.1",
-		"obsidian": "latest",
+		"obsidian": "^1.14.4",
 		"tsx": "^4.23.15",
 		"typescript": "^5.8.3",
 		"typescript-eslint": "^8.59.1"

@@ -1,8 +1,9 @@
 {
 	"id": "trip-ledger",
 	"name": "Trip Ledger",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"minAppVersion": "1.7.2",
 	"description": "Record trip expenses by date and see totals by category and place.",
+	"author": "SHIN.DONGMYUNG",
 	"isDesktopOnly": false
 }
