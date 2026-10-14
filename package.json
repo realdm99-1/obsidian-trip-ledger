@@ -1,6 +1,6 @@
 {
 	"name": "trip-ledger",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "Record trip expenses by date in Obsidian",
 	"main": "main.js",
 	"type": "module",

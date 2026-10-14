@@ -87,13 +87,22 @@ export class ConfirmDeleteModal extends Modal {
 		this.contentEl.createEl('h2', { text: t('deleteConfirm', this.language) });
 		new Setting(this.contentEl)
 			.addButton((button) => button.setButtonText(t('cancel', this.language)).onClick(() => this.close()))
-			.addButton((button) => button.setWarning().setButtonText(t('delete', this.language)).onClick(async () => {
-				try {
-					await this.onDelete();
-					this.close();
-				} catch (error) {
-					new Notice(`${t('failed', this.language)} ${error instanceof Error ? error.message : String(error)}`);
+			.addButton((button) => {
+				// Obsidian 1.7.2 lacks setDestructive; retain its warning button style.
+				const compatibleButton = button as { setDestructive?: () => void };
+				if (typeof compatibleButton.setDestructive === 'function') {
+					compatibleButton.setDestructive();
+				} else {
+					button.buttonEl.addClass('mod-warning');
 				}
-			}));
+				button.setButtonText(t('delete', this.language)).onClick(async () => {
+					try {
+						await this.onDelete();
+						this.close();
+					} catch (error) {
+						new Notice(`${t('failed', this.language)} ${error instanceof Error ? error.message : String(error)}`);
+					}
+				});
+			});
 	}
 }
