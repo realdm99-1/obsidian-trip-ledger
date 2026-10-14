@@ -3,7 +3,7 @@ name: Release Obsidian plugin
 on:
     push:
         tags:
-            - '*'
+            - '[0-9]*.[0-9]*.[0-9]*'
 
 jobs:
     build:
@@ -14,6 +14,10 @@ jobs:
             attestations: write
         steps:
             - uses: actions/checkout@v6
+
+            - name: Verify release tag
+              run: |
+                  node -e "const v = require('./manifest.json').version; if (process.env.GITHUB_REF_NAME !== v || !/^[0-9]+\.[0-9]+\.[0-9]+$/.test(v)) { console.error('Release tag must match the semantic version in manifest.json'); process.exit(1); }"
 
             - name: Use Node.js
               uses: actions/setup-node@v6

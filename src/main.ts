@@ -49,7 +49,7 @@ export default class TripLedgerPlugin extends Plugin {
 			void this.activateLedgerView();
 		});
 		this.addCommand({
-			id: 'open-trip-ledger',
+			id: 'open',
 			name: t('openLedger', this.settings.language),
 			callback: () => void this.activateLedgerView(),
 		});
