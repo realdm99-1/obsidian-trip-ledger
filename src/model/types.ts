@@ -1,0 +1,22 @@
+export interface Trip {
+	id: string;
+	name: string;
+	currency: string;
+	currencyLocked: boolean;
+	folderPath: string;
+}
+
+export interface Expense {
+	id: string;
+	date: string;
+	item: string;
+	amountMinor: number;
+	place: string;
+	categoryId: string;
+}
+
+export interface CustomCategory {
+	id: string;
+	name: string;
+	archived: boolean;
+}

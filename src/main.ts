@@ -1,114 +1,96 @@
-import {
-	Editor,
-	MarkdownView,
-	MarkdownFileInfo,
-	Modal,
-	Notice,
-	Plugin,
-} from 'obsidian';
-import {
-	DEFAULT_SETTINGS,
-	MyPluginSettings,
-	SampleSettingTab,
-} from './settings';
+import { Notice, Plugin, WorkspaceLeaf } from 'obsidian';
+import { t } from './i18n';
+import { ObsidianLedgerFiles } from './storage/obsidian-files';
+import { TripStore } from './storage/trip-store';
+import { CategoryStore } from './storage/category-store';
+import { ExpenseStore } from './storage/expense-store';
+import { DEFAULT_SETTINGS, TripLedgerSettings, TripLedgerSettingTab } from './settings';
+import { LedgerView, LEDGER_VIEW_TYPE } from './ui/ledger-view';
+import { RootManager } from './storage/root-manager';
+import { validateLedgerRootName } from './storage/paths';
+import { TripSelection } from './model/trip-selection';
+import { SettingsWriteQueue } from './model/settings-write-queue';
+import { LedgerDiscovery } from './storage/ledger-discovery';
+import { ObsidianDiscoverySource } from './storage/obsidian-discovery-source';
+import { LedgerSwitcher } from './storage/ledger-switcher';
 
-// Remember to rename these classes and interfaces!
+export default class TripLedgerPlugin extends Plugin {
+	settings!: TripLedgerSettings;
+	files!: ObsidianLedgerFiles;
+	tripStore!: TripStore;
+	categoryStore!: CategoryStore;
+	expenseStore!: ExpenseStore;
+	rootManager!: RootManager;
+	ledgerDiscovery!: LedgerDiscovery;
+	ledgerSwitcher!: LedgerSwitcher;
+	tripSelection!: TripSelection;
+	rootRecoveryWarning: string | null = null;
+	private settingsWriter!: SettingsWriteQueue<TripLedgerSettings>;
 
-export default class MyPlugin extends Plugin {
-	settings!: MyPluginSettings;
+	async onload(): Promise<void> {
+		this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData() as Partial<TripLedgerSettings> | null) };
+		this.settings.ledgerRoot = validateLedgerRootName(this.settings.ledgerRoot);
+		this.settingsWriter = new SettingsWriteQueue(this.settings, (snapshot) => this.saveData(snapshot));
+		this.files = new ObsidianLedgerFiles(this.app, this.settings.ledgerRoot);
+		this.rootManager = new RootManager(this.files, this.settings,
+			(next) => this.updateSettings(next), () => this.refreshViews(true));
+		this.rootRecoveryWarning = await this.rootManager.recover();
+		this.ledgerDiscovery = new LedgerDiscovery(new ObsidianDiscoverySource(this.app));
+		this.ledgerSwitcher = new LedgerSwitcher(this.files, this.settings, this.ledgerDiscovery,
+			(patch) => this.updateSettings(patch), () => this.refreshViews(true));
+		this.tripStore = new TripStore(this.files);
+		this.categoryStore = new CategoryStore(this.files);
+		this.expenseStore = new ExpenseStore(this.files);
+		this.tripSelection = new TripSelection(this.settings,
+			(id) => this.updateSettings({ lastSelectedTripId: id }), this.files);
 
-	async onload() {
-		await this.loadSettings();
-
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (_evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+		this.registerView(LEDGER_VIEW_TYPE, (leaf: WorkspaceLeaf) => new LedgerView(leaf, this));
+		this.addRibbonIcon('wallet', t('openLedger', this.settings.language), () => {
+			void this.activateLedgerView();
 		});
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
-		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			},
+			id: 'open-trip-ledger',
+			name: t('openLedger', this.settings.language),
+			callback: () => void this.activateLedgerView(),
 		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (
-				editor: Editor,
-				_ctx: MarkdownView | MarkdownFileInfo,
-			) => {
-				editor.replaceSelection('Sample editor command');
-			},
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView =
-					this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
-			},
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(activeDocument, 'click', (_evt: MouseEvent) => {
-			new Notice('Click');
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(
-			window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000),
-		);
+		this.addSettingTab(new TripLedgerSettingTab(this.app, this));
+		if (this.rootRecoveryWarning) new Notice(`${t('folderRecoveryWarning', this.settings.language)} ${this.rootRecoveryWarning}`);
 	}
 
-	onunload() {}
-
-	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			(await this.loadData()) as Partial<MyPluginSettings>,
-		);
+	async activateLedgerView(): Promise<void> {
+		const existing = this.app.workspace.getLeavesOfType(LEDGER_VIEW_TYPE)[0];
+		const leaf = existing ?? this.app.workspace.getLeaf(true);
+		await leaf.setViewState({ type: LEDGER_VIEW_TYPE, active: true });
+		await this.app.workspace.revealLeaf(leaf);
+		if (existing && leaf.view instanceof LedgerView) await leaf.view.render();
 	}
 
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	onOpen() {
-		const { contentEl } = this;
-		contentEl.setText('Woah!');
+	async selectCurrentTrip(folderPath: string): Promise<boolean> {
+		const candidates = await this.tripStore.listTripCandidates();
+		const selected = await this.tripSelection.chooseFolder(folderPath, candidates);
+		if (selected) this.refreshViews();
+		return selected;
 	}
 
-	onClose() {
-		const { contentEl } = this;
-		contentEl.empty();
+	async updateSettings(next: Partial<TripLedgerSettings>): Promise<void> {
+		await this.settingsWriter.update(next);
+	}
+
+	async renameLedgerRoot(name: string): Promise<void> {
+		await this.rootManager.rename(name);
+		this.rootRecoveryWarning = null;
+	}
+
+	async selectExistingLedger(root: string): Promise<void> {
+		await this.ledgerSwitcher.select(root);
+	}
+
+	refreshViews(rootChanged = false): void {
+		for (const leaf of this.app.workspace.getLeavesOfType(LEDGER_VIEW_TYPE)) {
+			if (leaf.view instanceof LedgerView) {
+				if (rootChanged) leaf.view.clearRootCache();
+				void leaf.view.render();
+			}
+		}
 	}
 }

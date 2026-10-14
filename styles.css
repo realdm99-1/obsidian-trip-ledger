@@ -1,8 +1,117 @@
-/*
+.trip-ledger-view {
+	padding: 16px;
+	overflow-y: auto;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.trip-ledger-view h2,
+.trip-ledger-view h3,
+.trip-ledger-view h4 {
+	margin-top: 0;
+}
 
-If your plugin does not need CSS, delete this file.
+.trip-ledger-trip-header,
+.trip-ledger-date-toolbar,
+.trip-ledger-actions {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 16px;
+}
 
-*/
+.trip-ledger-trip-header {
+	justify-content: space-between;
+}
+
+.trip-ledger-trip-header h3 {
+	margin-bottom: 0;
+}
+
+.trip-ledger-date-toolbar input[type='date'] {
+	min-width: 150px;
+}
+
+.trip-ledger-total {
+	font-size: var(--font-ui-large);
+	font-weight: 600;
+}
+
+.trip-ledger-table-wrap {
+	width: 100%;
+	overflow-x: auto;
+	margin-bottom: 18px;
+}
+
+.trip-ledger-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.trip-ledger-table th,
+.trip-ledger-table td {
+	padding: 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	text-align: left;
+	vertical-align: top;
+}
+
+.trip-ledger-table td:nth-child(2),
+.trip-ledger-table td:last-child {
+	white-space: nowrap;
+}
+
+.trip-ledger-table td:last-child button + button {
+	margin-left: 6px;
+}
+
+.trip-ledger-stats {
+	margin-top: 16px;
+	padding-top: 16px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.trip-ledger-stat-row {
+	margin: 10px 0;
+}
+
+.trip-ledger-stat-row > div:first-child,
+.trip-ledger-stat-row > div:nth-child(2) {
+	display: inline-block;
+	margin-right: 10px;
+}
+
+.trip-ledger-stat-track {
+	height: 8px;
+	margin-top: 5px;
+	border-radius: 4px;
+	background: var(--background-modifier-border);
+}
+
+.trip-ledger-stat-bar {
+	height: 100%;
+	border-radius: inherit;
+	background: var(--interactive-accent);
+}
+
+.trip-ledger-place-list {
+	padding-left: 20px;
+}
+
+.trip-ledger-error {
+	color: var(--text-error);
+}
+
+@media (max-width: 600px) {
+	.trip-ledger-view {
+		padding: 10px;
+	}
+
+	.trip-ledger-table {
+		min-width: 540px;
+	}
+
+	.trip-ledger-date-toolbar input[type='date'] {
+		min-width: 0;
+		flex: 1 1 170px;
+	}
+}
