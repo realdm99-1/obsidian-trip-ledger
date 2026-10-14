@@ -42,3 +42,7 @@ npm run lint
 Place the built `main.js`, `manifest.json`, and `styles.css` in `.obsidian/plugins/trip-ledger/` inside your vault. Enable **Trip Ledger** in **Settings → Community plugins**. If you develop inside that plugin folder, reload Obsidian after building.
 
 `main.js` and `node_modules/` are generated files and are not committed to Git.
+
+## License
+
+Trip Ledger is distributed under the Zero-Clause BSD (0BSD) license. See [LICENSE](LICENSE).

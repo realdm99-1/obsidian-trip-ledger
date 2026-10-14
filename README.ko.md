@@ -42,3 +42,7 @@ npm run lint
 빌드된 `main.js`, `manifest.json`, `styles.css`를 볼트의 `.obsidian/plugins/trip-ledger/`에 두고 **설정 → 커뮤니티 플러그인**에서 활성화합니다. 이 저장소를 해당 플러그인 폴더에서 개발한다면 빌드 후 Obsidian을 다시 로드하면 됩니다.
 
 `main.js`와 `node_modules/`는 생성 산출물이므로 Git에 추가하지 않습니다.
+
+## 라이선스
+
+Trip Ledger는 Zero-Clause BSD(0BSD) 라이선스로 배포됩니다. 자세한 내용은 [LICENSE](LICENSE)를 확인하세요.
