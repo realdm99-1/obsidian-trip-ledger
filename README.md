@@ -37,6 +37,6 @@ npm run build
 npm run lint
 ```
 
-빌드된 `main.js`, `manifest.json`, `styles.css`를 볼트의 `.obsidian/plugins/obsidian-trip-ledger/`에 두고 **설정 → 커뮤니티 플러그인**에서 활성화합니다. 이 저장소를 해당 플러그인 폴더에서 개발한다면 빌드 후 Obsidian을 다시 로드하면 됩니다.
+빌드된 `main.js`, `manifest.json`, `styles.css`를 볼트의 `.obsidian/plugins/trip-ledger/`에 두고 **설정 → 커뮤니티 플러그인**에서 활성화합니다. 이 저장소를 해당 플러그인 폴더에서 개발한다면 빌드 후 Obsidian을 다시 로드하면 됩니다.
 
 `main.js`와 `node_modules/`는 생성 산출물이므로 Git에 추가하지 않습니다.
