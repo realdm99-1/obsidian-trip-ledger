@@ -4,6 +4,7 @@ export interface ExpenseSummary {
 	totalMinor: number;
 	byCategory: Map<string, number>;
 	byPlace: Map<string, number>;
+	byDate: Map<string, number>;
 }
 
 function addSafe(left: number, right: number): number {
@@ -15,13 +16,15 @@ function addSafe(left: number, right: number): number {
 export function summarize(expenses: Expense[]): ExpenseSummary {
 	const byCategory = new Map<string, number>();
 	const byPlace = new Map<string, number>();
+	const byDate = new Map<string, number>();
 	let totalMinor = 0;
 	for (const expense of expenses) {
 		totalMinor = addSafe(totalMinor, expense.amountMinor);
 		byCategory.set(expense.categoryId, addSafe(byCategory.get(expense.categoryId) ?? 0, expense.amountMinor));
 		byPlace.set(expense.place, addSafe(byPlace.get(expense.place) ?? 0, expense.amountMinor));
+		byDate.set(expense.date, addSafe(byDate.get(expense.date) ?? 0, expense.amountMinor));
 	}
-	return { totalMinor, byCategory, byPlace };
+	return { totalMinor, byCategory, byPlace, byDate };
 }
 
 export function categoryPercent(amountMinor: number, totalMinor: number): number {

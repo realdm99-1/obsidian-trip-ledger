@@ -9,7 +9,7 @@ Trip Ledger is an Obsidian plugin for recording expenses by date for each trip a
 1. In **Settings → Trip Ledger → Current trip**, select **Create trip**, then enter a trip name and currency code. The plugin creates a separate folder and selects the new trip.
 2. Run **Open trip ledger** from the command palette or select the wallet icon in the left ribbon. The dashboard shows today's expenses and the dates with records for the current trip. If no trip is selected yet, the view prompts you to create one in settings.
 3. Use **Add expense** on the dashboard to record today's **What**, **Amount**, **Where**, and **Category**. Select a recorded date, or choose another date with the date picker, to open that day's details and add earlier expenses. Select **Back to dashboard** to return. You can edit or delete expenses in either view.
-4. Select **Show statistics** to see the current trip's totals and shares by category, plus totals by place.
+4. Select **Show statistics** to see the trip total. Switch between **By category** for a share chart, **By date** for daily totals, and **By place** for spending by location.
 5. In a date's details, select **Open day note** to open its Markdown file in Obsidian. Running **Open trip ledger** again returns to the dashboard.
 
 To edit an earlier trip, use **Settings → Trip Ledger → Select trip folder**. The list includes only direct child folders of the configured ledger folder. Each candidate needs a valid `trip.md`. An invalid folder shows an error and leaves the current selection unchanged. Creating a new trip for a later visit keeps its records separate. Obsidian restores the selected trip on restart; if that trip is missing, select another or create a new one.

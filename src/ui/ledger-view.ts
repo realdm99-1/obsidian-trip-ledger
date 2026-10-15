@@ -11,7 +11,7 @@ import { dayPath } from '../storage/paths';
 import { TripModal } from './trip-modal';
 import { ConfirmDeleteModal, ExpenseModal } from './expense-modal';
 import { renderDayTable } from './day-table';
-import { renderStatsPanel } from './stats-panel';
+import { renderStatsPanel, type StatsBreakdown } from './stats-panel';
 import { renderDashboard } from './dashboard';
 
 export const LEDGER_VIEW_TYPE = 'trip-ledger-view';
@@ -21,6 +21,7 @@ export class LedgerView extends ItemView {
 	private renderedTripKey: string | null = null;
 	private generation = 0;
 	private showStats = false;
+	private selectedStatsBreakdown: StatsBreakdown = 'category';
 	private refreshTimer: number | null = null;
 	private midnightTimer: number | null = null;
 	private recentDatesCache = new Map<string, string[]>();
@@ -35,6 +36,7 @@ export class LedgerView extends ItemView {
 		this.daySummariesCache.clear();
 		this.screen = { kind: 'dashboard' };
 		this.renderedTripKey = null;
+		this.selectedStatsBreakdown = 'category';
 	}
 
 	async showDashboard(): Promise<void> {
@@ -98,6 +100,7 @@ export class LedgerView extends ItemView {
 				if (this.renderedTripKey !== tripKey) {
 					this.screen = { kind: 'dashboard' };
 					this.showStats = false;
+					this.selectedStatsBreakdown = 'category';
 					this.renderedTripKey = tripKey;
 				}
 				this.renderTripHeader(state.trip);
@@ -156,7 +159,8 @@ export class LedgerView extends ItemView {
 			onOpenDate: (date) => { this.screen = { kind: 'day', date }; this.showStats = false; void this.render(); },
 			onToggleStats: () => { this.showStats = !this.showStats; void this.render(); },
 		});
-		if (this.showStats) renderStatsPanel(this.contentEl, all ?? [], categories, trip.currency, this.plugin.settings.language);
+		if (this.showStats) renderStatsPanel(this.contentEl, all ?? [], categories, trip.currency, this.plugin.settings.language,
+			{ selected: this.selectedStatsBreakdown, onSelect: (kind) => { this.selectedStatsBreakdown = kind; } });
 	}
 
 	private async renderTripDetails(trip: Trip, selectedDate: string, generation: number): Promise<void> {
@@ -205,7 +209,8 @@ export class LedgerView extends ItemView {
 		const statsButton = this.contentEl.createEl('button', { text: t(this.showStats ? 'hideStats' : 'showStats', language) });
 		statsButton.addEventListener('click', () => { this.showStats = !this.showStats; void this.render(); });
 		if (this.showStats) {
-			renderStatsPanel(this.contentEl, all ?? [], categories, trip.currency, language);
+			renderStatsPanel(this.contentEl, all ?? [], categories, trip.currency, language,
+				{ selected: this.selectedStatsBreakdown, onSelect: (kind) => { this.selectedStatsBreakdown = kind; } });
 		}
 	}
 

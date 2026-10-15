@@ -16,22 +16,32 @@ class Element {
 	children: Element[] = [];
 	value = '';
 	disabled = false;
-	style = { width: '' };
+	hidden = false;
+	style = { width: '', background: '' };
+	attributes = new Map<string, string>();
 	listeners = new Map<string, () => void>();
 	constructor(readonly tag: string, readonly text = '', readonly cls = '') {}
 	empty(): void { this.children = []; }
 	addClass(): void {}
-	createEl(tag: string, options: { text?: string; cls?: string; value?: string } = {}): Element {
+	createEl(tag: string, options: { text?: string; cls?: string; value?: string; attr?: Record<string, string> } = {}): Element {
 		const child = new Element(tag, options.text ?? '', options.cls ?? '');
 		child.value = options.value ?? '';
+		for (const [name, value] of Object.entries(options.attr ?? {})) child.setAttribute(name, value);
 		this.children.push(child);
 		return child;
 	}
-	createDiv(options: { text?: string; cls?: string } = {}): Element {
+	createDiv(options: { text?: string; cls?: string; attr?: Record<string, string> } = {}): Element {
 		const child = new Element('div', options.text ?? '', options.cls ?? '');
+		for (const [name, value] of Object.entries(options.attr ?? {})) child.setAttribute(name, value);
 		this.children.push(child);
 		return child;
 	}
+	createSpan(options: { text?: string } = {}): Element {
+		const child = new Element('span', options.text ?? '');
+		this.children.push(child);
+		return child;
+	}
+	setAttribute(name: string, value: string): void { this.attributes.set(name, value); }
 	createTHead(): Element { return this.createEl('thead'); }
 	createTBody(): Element { return this.createEl('tbody'); }
 	insertRow(): Element { return this.createEl('tr'); }
@@ -130,6 +140,31 @@ test('ribbon reentry shows the dashboard and saved expenses follow their dates',
 	assert.ok(secondModal);
 	await secondModal.save({ id: 'past', date: '2026-10-13', item: '교통', amountMinor: 200, place: '역', categoryId: 'transport' });
 	assert.equal(contentEl.find((element) => element.tag === 'input' && element.value === '2026-10-13').length, 1);
+});
+
+test('saving an expense keeps the selected statistics tab open', async () => {
+	const { LedgerView, modal } = await loadPluginClasses();
+	const files = new MemoryLedgerFiles();
+	const tripStore = new TripStore(files);
+	const trip = await tripStore.createTrip('일본', 'JPY');
+	const expenseStore = new ExpenseStore(files);
+	await expenseStore.upsert(trip, { id: 'old', date: '2026-10-14', item: '점심', amountMinor: 1000, place: '식당', categoryId: 'food' });
+	const settings = { language: 'ko', lastSelectedTripId: trip.id };
+	const root = new Element('root');
+	const app = { vault: { getAbstractFileByPath: () => null } };
+	const plugin = { app, settings, files, tripStore, expenseStore,
+		categoryStore: new CategoryStore(files), tripSelection: new TripSelection(settings, async () => {}, files) };
+	const view = new LedgerView({ app, contentEl: root }, plugin);
+	await view.render();
+	root.find((element) => element.tag === 'button' && element.text === '통계 보기')[0]!.click();
+	await new Promise<void>((resolve) => setImmediate(resolve));
+	root.find((element) => element.tag === 'button' && element.text === '날짜별 지출')[0]!.click();
+	assert.equal(root.find((element) => element.tag === 'button' && element.text === '날짜별 지출')[0]!
+		.attributes.get('aria-pressed'), 'true');
+	root.find((element) => element.tag === 'button' && element.text === '지출 추가')[0]!.click();
+	await modal.latest!.save({ id: 'new', date: todayLocal(), item: '커피', amountMinor: 500, place: '카페', categoryId: 'food' });
+	assert.equal(root.find((element) => element.tag === 'button' && element.text === '날짜별 지출')[0]!
+		.attributes.get('aria-pressed'), 'true');
 });
 
 test('a vault change cannot let an older summary load keep the dashboard stale', async () => {

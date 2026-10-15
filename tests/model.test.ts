@@ -49,6 +49,19 @@ test('category and place totals each reconcile with trip total', () => {
 	assert.equal([...result.byPlace.values()].reduce((a, b) => a + b, 0), 4700);
 });
 
+test('daily totals stay separate and reconcile with the trip total', () => {
+	const result = summarize([
+		{ id: '1', date: '2026-10-14', item: '점심', amountMinor: 1200, place: '식당', categoryId: 'food' },
+		{ id: '2', date: '2026-10-14', item: '커피', amountMinor: 300, place: '카페', categoryId: 'food' },
+		{ id: '3', date: '2026-10-15', item: '버스', amountMinor: 500, place: '역', categoryId: 'transport' },
+	]);
+	assert.deepEqual([...result.byDate.entries()].sort(), [
+		['2026-10-14', 1500],
+		['2026-10-15', 500],
+	]);
+	assert.equal([...result.byDate.values()].reduce((sum, amount) => sum + amount, 0), result.totalMinor);
+});
+
 test('category names avoid duplicates in either built-in language', () => {
 	assert.equal(validateCategoryName('  기념품  ', []), '기념품');
 	assert.throws(() => validateCategoryName('Food', []));
