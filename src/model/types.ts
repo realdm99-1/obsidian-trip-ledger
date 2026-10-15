@@ -15,6 +15,12 @@ export interface Expense {
 	categoryId: string;
 }
 
+export interface DaySummary {
+	date: string;
+	count: number;
+	totalMinor: number;
+}
+
 export interface CustomCategory {
 	id: string;
 	name: string;

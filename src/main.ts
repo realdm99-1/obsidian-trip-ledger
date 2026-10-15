@@ -62,7 +62,7 @@ export default class TripLedgerPlugin extends Plugin {
 		const leaf = existing ?? this.app.workspace.getLeaf(true);
 		await leaf.setViewState({ type: LEDGER_VIEW_TYPE, active: true });
 		await this.app.workspace.revealLeaf(leaf);
-		if (existing && leaf.view instanceof LedgerView) await leaf.view.render();
+		if (existing && leaf.view instanceof LedgerView) await leaf.view.showDashboard();
 	}
 
 	async selectCurrentTrip(folderPath: string): Promise<boolean> {

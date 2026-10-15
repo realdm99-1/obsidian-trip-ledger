@@ -1,5 +1,6 @@
-import type { Expense, Trip } from '../model/types';
+import type { DaySummary, Expense, Trip } from '../model/types';
 import { isDateKey } from '../model/dates';
+import { summarize } from '../model/aggregate';
 import type { LedgerFiles } from './obsidian-files';
 import { datesFolderPath, dayPath, tripFilePath } from './paths';
 import { parseDay } from './schema';
@@ -105,6 +106,20 @@ export class ExpenseStore {
 			if (rows.length > 0) dates.push(date);
 		}
 		return dates.sort().reverse();
+	}
+
+	async listDaySummaries(trip: Trip): Promise<DaySummary[]> {
+		const paths = await this.files.listMarkdownPaths(datesFolderPath(trip.folderPath, this.files.root));
+		const summaries: DaySummary[] = [];
+		for (const path of paths) {
+			const date = path.split('/').pop()?.replace(/\.md$/, '') ?? '';
+			if (!isDateKey(date)) continue;
+			const rows = await this.loadDay(trip, date);
+			if (rows.length > 0) {
+				summaries.push({ date, count: rows.length, totalMinor: summarize(rows).totalMinor });
+			}
+		}
+		return summaries.sort((a, b) => b.date.localeCompare(a.date));
 	}
 
 	async loadAll(trip: Trip): Promise<Expense[]> {

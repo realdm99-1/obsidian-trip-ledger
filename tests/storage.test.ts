@@ -173,6 +173,29 @@ test('a custom ledger folder contains trips, categories, and dated expenses', as
 	assert.ok(await files.readFrontmatter(`${trip.folderPath}/dates/2026-10-14.md`));
 });
 
+test('day summaries include only nonempty dates in the selected trip, newest first', async () => {
+	const files = new MemoryLedgerFiles();
+	const trips = new TripStore(files);
+	const first = await trips.createTrip('일본', 'JPY');
+	const second = await trips.createTrip('미국', 'USD');
+	const store = new ExpenseStore(files);
+	const expense = (id: string, date: string, amountMinor: number) => ({
+		id, date, item: id, amountMinor, place: '식당', categoryId: 'food',
+	});
+	await store.upsert(first, expense('old-1', '2026-10-14', 1000));
+	await store.upsert(first, expense('old-2', '2026-10-14', 500));
+	await store.upsert(first, expense('new', '2026-10-15', 300));
+	const removed = expense('empty', '2026-10-13', 400);
+	await store.upsert(first, removed);
+	await store.remove(first, removed.id, removed.date, removed);
+	await store.upsert(second, expense('foreign', '2026-10-16', 900));
+
+	assert.deepEqual(await store.listDaySummaries(first), [
+		{ date: '2026-10-15', count: 1, totalMinor: 300 },
+		{ date: '2026-10-14', count: 2, totalMinor: 1500 },
+	]);
+});
+
 test('renaming the ledger folder preserves trips, categories, expenses, and note bodies', async () => {
 	const files = new MemoryLedgerFiles();
 	const trip = await new TripStore(files).createTrip('일본', 'JPY');

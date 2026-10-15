@@ -31,9 +31,28 @@
 	min-width: 150px;
 }
 
+.trip-ledger-back-button {
+	display: block;
+	margin-bottom: 16px;
+}
+
 .trip-ledger-total {
 	font-size: var(--font-ui-large);
 	font-weight: 600;
+}
+
+.trip-ledger-dashboard-today,
+.trip-ledger-dashboard-history {
+	margin-bottom: 24px;
+}
+
+.trip-ledger-date-entry {
+	display: block;
+	width: 100%;
+	margin: 6px 0;
+	text-align: left;
+	white-space: normal;
+	overflow-wrap: anywhere;
 }
 
 .trip-ledger-table-wrap {
