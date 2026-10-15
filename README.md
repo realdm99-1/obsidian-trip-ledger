@@ -4,6 +4,18 @@ English | [한국어](README.ko.md)
 
 Trip Ledger is an Obsidian plugin for recording expenses by date for each trip and reviewing totals by category and place. The plugin interface defaults to Korean and also supports English. To switch, open **Settings → Trip Ledger → Language**.
 
+## Screenshots
+
+### Dashboard
+
+![Trip Ledger dashboard with the Obsidian sidebar, today's expenses, and recorded dates](screenshots/trip-ledger-dashboard-readme.jpg)
+
+### Statistics
+
+![Trip total and spending by category chart](screenshots/trip-ledger-statistics-readme.jpg)
+
+The screenshots show an example trip with the interface set to English.
+
 ## Usage
 
 1. In **Settings → Trip Ledger → Current trip**, select **Create trip**, then enter a trip name and currency code. The plugin creates a separate folder and selects the new trip.

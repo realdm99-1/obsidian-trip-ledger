@@ -4,6 +4,18 @@
 
 Obsidian에서 여행별 지출을 날짜별로 기록하고, 종류와 사용처별 합계를 확인하는 플러그인입니다. 한국어가 기본 언어이며 영어 UI도 제공합니다.
 
+## 스크린샷
+
+### 대시보드
+
+![Obsidian 사이드바와 오늘 지출, 기록된 날짜를 보여주는 Trip Ledger 대시보드](screenshots/trip-ledger-dashboard-readme.jpg)
+
+### 통계
+
+![여행 총액과 종류별 지출 그래프를 보여주는 Trip Ledger 통계](screenshots/trip-ledger-statistics-readme.jpg)
+
+스크린샷은 예시 여행에서 영어 인터페이스로 촬영했습니다.
+
 ## 사용법
 
 1. **설정 → Trip Ledger → 현재 여행**에서 **여행 만들기**를 선택하고 이름과 통화 코드를 입력합니다. 새 여행은 별도 폴더에 생성되고 현재 여행으로 저장됩니다.
