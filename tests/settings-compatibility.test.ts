@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
 import { build } from 'esbuild';
+import { LedgerDiscovery } from '../src/storage/ledger-discovery';
+import { LedgerSwitcher } from '../src/storage/ledger-switcher';
+import { MemoryLedgerFiles } from './support/memory-ledger-files';
 
 class FakeContainer {
 	rows: FakeSetting[] = [];
@@ -17,18 +20,23 @@ class FakeSetting {
 	desc = '';
 	controls = 0;
 	options: string[] = [];
+	buttonClick?: () => void | Promise<void>;
+	buttonText = '';
+	textChange?: (value: string) => void;
 	dropdownChange?: (value: string) => void | Promise<void>;
 	constructor(container?: FakeContainer) { container?.rows.push(this); }
 	setName(name: string): this { this.name = name; return this; }
 	setDesc(desc: string): this { this.desc = desc; return this; }
 	setHeading(): this { return this; }
 	clear(): this { this.controls = 0; this.options = []; return this; }
-	addButton(configure?: (button: { setCta: () => unknown; setButtonText: (text: string) => unknown; onClick: (callback: () => void) => unknown }) => void): this {
+	addButton(configure?: (button: { setCta: () => unknown; setButtonText: (text: string) => unknown;
+		setDisabled: (disabled: boolean) => unknown; onClick: (callback: () => void | Promise<void>) => unknown }) => void): this {
 		this.controls++;
 		const button = {
 			setCta() { return this; },
-			setButtonText() { return this; },
-			onClick() { return this; },
+			setButtonText: (text: string) => { this.buttonText = text; return button; },
+			setDisabled() { return this; },
+			onClick: (callback: () => void | Promise<void>) => { this.buttonClick = callback; return button; },
 		};
 		configure?.(button);
 		return this;
@@ -44,7 +52,10 @@ class FakeSetting {
 		return this;
 	}
 	addText(configure: (text: { setValue: (value: string) => unknown; onChange: (callback: (value: string) => void) => unknown }) => void): this {
-		const text = { setValue: () => text, onChange: () => text };
+		const text = {
+			setValue: () => text,
+			onChange: (callback: (value: string) => void) => { this.textChange = callback; return text; },
+		};
 		configure(text);
 		return this;
 	}
@@ -116,6 +127,70 @@ test('modern settings load categories once and refresh searchable rows', async (
 	assert.equal(loads, 1);
 	assert.equal(tab.updates, 1);
 	assert.ok(categoryGroup(tab).items.some((item) => item.name === 'Food'));
+});
+
+test('the ledger folder setting connects a typed existing ledger without renaming it', async () => {
+	const SettingTab = await loadSettingTab();
+	const files = new MemoryLedgerFiles();
+	files.seed('여행 장부/메모.md', { title: 'private note' }, 'keep this text');
+	const settings = { language: 'ko' as const, ledgerRoot: 'Trip Ledger', lastSelectedTripId: null };
+	const discovery = new LedgerDiscovery({
+		listRoots: async () => ['여행 장부'],
+		listTripFolders: async () => [],
+		readFrontmatter: async () => null,
+	});
+	const switcher = new LedgerSwitcher(files, settings, discovery, async () => {});
+	let renames = 0;
+	const plugin = {
+		settings,
+		files,
+		rootRecoveryWarning: null,
+		renameLedgerRoot: async () => { renames++; throw new Error('Folder already exists'); },
+		selectExistingLedger: (name: string, options?: { allowUninitialized?: boolean }) => switcher.select(name, options),
+	};
+	const tab = new SettingTab({}, plugin);
+	const row = tab.getSettingDefinitions().find((item) => item.name === '장부 폴더');
+	assert.ok(row?.render);
+	const setting = new FakeSetting();
+	(row.render as (setting: FakeSetting) => void)(setting);
+	assert.equal(setting.buttonText, '폴더 설정');
+	setting.textChange?.('여행 장부');
+	await setting.buttonClick?.();
+	assert.equal(plugin.files.root, '여행 장부');
+	assert.equal(renames, 0);
+	assert.equal(files.bodyAt('여행 장부/메모.md'), 'keep this text');
+});
+
+test('selecting the already configured ledger selects its sole synced trip', async () => {
+	const SettingTab = await loadSettingTab();
+	const files = new MemoryLedgerFiles();
+	const trip = { 'trip-ledger': 'trip', schemaVersion: 1, id: 'synced',
+		name: '일본', currency: 'JPY', currencyLocked: false };
+	files.seed('Trip Ledger/일본/trip.md', trip);
+	const settings = { language: 'ko' as const, ledgerRoot: 'Trip Ledger', lastSelectedTripId: null };
+	const discovery = new LedgerDiscovery({
+		listRoots: async () => ['Trip Ledger'],
+		listTripFolders: async () => ['Trip Ledger/일본'],
+		readFrontmatter: async (path) => path === 'Trip Ledger/일본/trip.md' ? trip : null,
+	});
+	const switcher = new LedgerSwitcher(files, settings, discovery, async () => {});
+	const plugin = {
+		settings,
+		files,
+		rootRecoveryWarning: null,
+		ledgerDiscovery: discovery,
+		selectExistingLedger: (name: string) => switcher.select(name),
+	};
+	const tab = new SettingTab({}, plugin);
+	const row = tab.getSettingDefinitions().find((item) => item.heading === '기존 장부 선택') as {
+		items: Array<{ render: (setting: FakeSetting) => void }>;
+	};
+	const setting = new FakeSetting();
+	row.items[0]!.render(setting);
+	await new Promise<void>((resolve) => { setImmediate(resolve); });
+	await setting.buttonClick?.();
+	assert.equal(settings.lastSelectedTripId, 'synced');
+	assert.deepEqual(await files.readFrontmatter('Trip Ledger/일본/trip.md'), trip);
 });
 
 test('switching ledgers discards categories loaded from the previous ledger', async () => {

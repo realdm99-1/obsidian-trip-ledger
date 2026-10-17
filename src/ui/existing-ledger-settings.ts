@@ -32,10 +32,8 @@ export async function configureExistingLedgerSetting(
 				inProgress = true;
 				button.setDisabled(true);
 				try {
-					if (selectedRoot !== plugin.files.root) {
-						await plugin.selectExistingLedger(selectedRoot);
-						new Notice(t('ledgerSelected', language));
-					}
+					await plugin.selectExistingLedger(selectedRoot);
+					new Notice(t('ledgerSelected', language));
 				} catch (error) {
 					new Notice(`${t('ledgerSelectFailed', language)} ${error instanceof Error ? error.message : String(error)}`);
 				} finally {

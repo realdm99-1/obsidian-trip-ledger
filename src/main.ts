@@ -81,8 +81,8 @@ export default class TripLedgerPlugin extends Plugin {
 		this.rootRecoveryWarning = null;
 	}
 
-	async selectExistingLedger(root: string): Promise<void> {
-		await this.ledgerSwitcher.select(root);
+	async selectExistingLedger(root: string, options: { allowUninitialized?: boolean } = {}): Promise<void> {
+		await this.ledgerSwitcher.select(root, options);
 	}
 
 	refreshViews(rootChanged = false): void {

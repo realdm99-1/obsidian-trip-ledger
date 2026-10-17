@@ -150,6 +150,114 @@ test('selecting a moved ledger keeps a uniquely matching current trip without ch
 	assert.equal(refreshes, 1);
 });
 
+test('a new computer selects the sole trip in a connected existing ledger', async () => {
+	const { files, source, settings, original } = setup(null);
+	await new LedgerSwitcher(files, settings, new LedgerDiscovery(source), async () => {})
+		.select('2026-1', { allowUninitialized: true });
+	assert.equal(settings.ledgerRoot, '2026-1');
+	assert.equal(settings.lastSelectedTripId, 'other');
+	assert.deepEqual(await files.readFrontmatter('2026-1/일본/trip.md'), original);
+});
+
+test('configuring the current folder selects its sole synced trip', async () => {
+	const files = new MemoryLedgerFiles('2026-1');
+	const { source, settings, original } = setup(null, files);
+	settings.ledgerRoot = '2026-1';
+	await new LedgerSwitcher(files, settings, new LedgerDiscovery(source), async () => {})
+		.select('2026-1', { allowUninitialized: true });
+	assert.equal(settings.lastSelectedTripId, 'other');
+	assert.deepEqual(await files.readFrontmatter('2026-1/일본/trip.md'), original);
+});
+
+test('configuring the current folder rejects malformed ledger metadata', async () => {
+	const files = new MemoryLedgerFiles('2026-1');
+	const invalid = { 'trip-ledger': 'categories', schemaVersion: 2, categories: [] };
+	files.seed('2026-1/categories.md', invalid);
+	const source = new TargetSource();
+	source.data.set('2026-1/categories.md', invalid);
+	const settings: LedgerSwitchSettings = { ledgerRoot: '2026-1', lastSelectedTripId: null };
+	await assert.rejects(new LedgerSwitcher(files, settings, new LedgerDiscovery(source), async () => {})
+		.select('2026-1', { allowUninitialized: true }), /2026-1\/categories\.md/);
+	assert.equal(settings.lastSelectedTripId, null);
+	assert.deepEqual(await files.readFrontmatter('2026-1/categories.md'), invalid);
+});
+
+test('configuring a folder with unrelated content keeps that content and selects it as a new ledger', async () => {
+	const files = new MemoryLedgerFiles();
+	files.seed('여행 장부/메모.md', { title: 'private note' }, 'keep this text');
+	const source = new TargetSource();
+	source.roots = ['여행 장부'];
+	const settings: LedgerSwitchSettings = { ledgerRoot: 'Trip Ledger', lastSelectedTripId: null };
+	await new LedgerSwitcher(files, settings, new LedgerDiscovery(source), async () => {})
+		.select('여행 장부', { allowUninitialized: true });
+	assert.equal(files.root, '여행 장부');
+	assert.equal(settings.ledgerRoot, '여행 장부');
+	assert.deepEqual(await files.readFrontmatter('여행 장부/메모.md'), { title: 'private note' });
+	assert.equal(files.bodyAt('여행 장부/메모.md'), 'keep this text');
+});
+
+test('a folder with valid categories but no trips can be configured without changing its file', async () => {
+	const files = new MemoryLedgerFiles();
+	const categories = { 'trip-ledger': 'categories', schemaVersion: 1,
+		categories: [{ id: 'food', name: 'Food', archived: false }] };
+	files.seed('여행 장부/categories.md', categories, 'keep this text');
+	const source = new TargetSource();
+	source.roots = ['여행 장부'];
+	source.data.set('여행 장부/categories.md', categories);
+	const settings: LedgerSwitchSettings = { ledgerRoot: 'Trip Ledger', lastSelectedTripId: null };
+	await new LedgerSwitcher(files, settings, new LedgerDiscovery(source), async () => {})
+		.select('여행 장부', { allowUninitialized: true });
+	assert.equal(files.root, '여행 장부');
+	assert.equal(settings.lastSelectedTripId, null);
+	assert.deepEqual(await files.readFrontmatter('여행 장부/categories.md'), categories);
+	assert.equal(files.bodyAt('여행 장부/categories.md'), 'keep this text');
+});
+
+test('a conflicting categories file blocks folder configuration without changing the active ledger', async () => {
+	const files = new MemoryLedgerFiles();
+	const invalid = { 'trip-ledger': 'categories', schemaVersion: 2, categories: [] };
+	files.seed('여행 장부/categories.md', invalid, 'keep this text');
+	const source = new TargetSource();
+	source.roots = ['여행 장부'];
+	source.data.set('여행 장부/categories.md', invalid);
+	const settings: LedgerSwitchSettings = { ledgerRoot: 'Trip Ledger', lastSelectedTripId: null };
+	await assert.rejects(new LedgerSwitcher(files, settings, new LedgerDiscovery(source), async () => {})
+		.select('여행 장부', { allowUninitialized: true }), /여행 장부\/categories\.md/);
+	assert.equal(files.root, 'Trip Ledger');
+	assert.equal(settings.ledgerRoot, 'Trip Ledger');
+	assert.equal(files.bodyAt('여행 장부/categories.md'), 'keep this text');
+});
+
+test('an unreadable trip file cannot turn an existing folder into a new ledger', async () => {
+	const files = new MemoryLedgerFiles();
+	const invalid = { 'trip-ledger': 'trip', schemaVersion: 2, id: 'trip-1' };
+	files.seed('여행 장부/일본/trip.md', invalid, 'keep this text');
+	const source = new TargetSource();
+	source.roots = ['여행 장부'];
+	source.folders.set('여행 장부', ['여행 장부/일본']);
+	source.data.set('여행 장부/일본/trip.md', invalid);
+	const settings: LedgerSwitchSettings = { ledgerRoot: 'Trip Ledger', lastSelectedTripId: null };
+	await assert.rejects(new LedgerSwitcher(files, settings, new LedgerDiscovery(source), async () => {})
+		.select('여행 장부', { allowUninitialized: true }), /여행 장부\/일본\/trip\.md/);
+	assert.equal(files.root, 'Trip Ledger');
+	assert.equal(settings.ledgerRoot, 'Trip Ledger');
+	assert.equal(files.bodyAt('여행 장부/일본/trip.md'), 'keep this text');
+});
+
+test('duplicate trip IDs alone cannot qualify an existing folder for configuration', async () => {
+	const files = new MemoryLedgerFiles();
+	const source = new TargetSource();
+	source.addTrip('첫 여행', 'duplicate');
+	source.addTrip('둘째 여행', 'duplicate');
+	files.seed('2026-1/첫 여행/trip.md', source.data.get('2026-1/첫 여행/trip.md')!);
+	files.seed('2026-1/둘째 여행/trip.md', source.data.get('2026-1/둘째 여행/trip.md')!);
+	const settings: LedgerSwitchSettings = { ledgerRoot: 'Trip Ledger', lastSelectedTripId: null };
+	await assert.rejects(new LedgerSwitcher(files, settings, new LedgerDiscovery(source), async () => {})
+		.select('2026-1', { allowUninitialized: true }), /Duplicate trip ID: duplicate/);
+	assert.equal(files.root, 'Trip Ledger');
+	assert.equal(settings.ledgerRoot, 'Trip Ledger');
+});
+
 test('switching to a ledger without the selected trip clears the current trip', async () => {
 	const { files, source, settings } = setup('old-trip');
 	source.data.get('2026-1/일본/trip.md')!.id = 'new-trip';

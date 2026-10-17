@@ -163,18 +163,22 @@ export class TripLedgerSettingTab extends PluginSettingTab {
 				.setValue(requestedName)
 				.onChange((value) => { requestedName = value; }))
 			.addButton((button) => button
-				.setButtonText(t('renameFolder', language))
+				.setButtonText(t('setFolder', language))
 				.onClick(async () => {
 					if (inProgress) return;
 					inProgress = true;
 					button.setDisabled(true);
 					try {
-						await this.plugin.renameLedgerRoot(requestedName);
-						new Notice(t('folderRenamed', language));
+						if (await this.plugin.files.rootExists(requestedName)) {
+							await this.plugin.selectExistingLedger(requestedName, { allowUninitialized: true });
+						} else {
+							await this.plugin.renameLedgerRoot(requestedName);
+						}
+						new Notice(t('folderConfigured', language));
 						this.refreshCategorySettings();
 					} catch (error) {
 						this.redisplay();
-						new Notice(`${t('folderRenameFailed', language)} ${error instanceof Error ? error.message : String(error)}`);
+						new Notice(`${t('folderConfigureFailed', language)} ${error instanceof Error ? error.message : String(error)}`);
 					} finally {
 						inProgress = false;
 						button.setDisabled(false);
